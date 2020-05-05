@@ -1,10 +1,11 @@
 package resource
 
 import (
-	"github.com/google/go-github/github"
 	"regexp"
 	"strconv"
 	"time"
+
+	"github.com/google/go-github/github"
 )
 
 var defaultTagFilter = "^v?([^v].*)"
@@ -32,14 +33,24 @@ func (vp *versionParser) parse(tag string) string {
 	return ""
 }
 
+// getTimestamp returns the last time a give release was modified, including its
+// assets.
 func getTimestamp(release *github.RepositoryRelease) time.Time {
-	if release.PublishedAt != nil {
-		return release.PublishedAt.Time
-	} else if release.CreatedAt != nil {
-		return release.CreatedAt.Time
-	} else {
-		return time.Time{}
+	var latestTime time.Time
+	for _, asset := range release.Assets {
+		if asset.CreatedAt != nil && asset.CreatedAt.After(latestTime) {
+			latestTime = asset.CreatedAt.Time
+		}
+		if asset.UpdatedAt != nil && asset.UpdatedAt.After(latestTime) {
+			latestTime = asset.UpdatedAt.Time
+		}
 	}
+	if release.PublishedAt != nil && release.PublishedAt.After(latestTime) {
+		latestTime = release.PublishedAt.Time
+	} else if release.CreatedAt != nil && release.CreatedAt.After(latestTime) {
+		latestTime = release.CreatedAt.Time
+	}
+	return latestTime
 }
 
 func versionFromRelease(release *github.RepositoryRelease) Version {
